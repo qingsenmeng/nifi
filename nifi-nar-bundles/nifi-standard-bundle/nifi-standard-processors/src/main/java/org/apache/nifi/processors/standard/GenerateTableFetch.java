@@ -350,7 +350,7 @@ public class GenerateTableFetch extends AbstractDatabaseFetchProcessor {
                     Integer type = getColumnType(tableName, colName, dbAdapter);
 
                     // Add a condition for the WHERE clause
-                    maxValueClauses.add(colName + (index == 0 ? " > " : " >= ") + getLiteralByType(type, maxValue, dbAdapter.getName()));
+                    maxValueClauses.add(colName + " >= " + getLiteralByType(type, maxValue, dbAdapter.getName()));
                 }
 
             });
@@ -416,6 +416,10 @@ public class GenerateTableFetch extends AbstractDatabaseFetchProcessor {
                         try {
                             String newMaxValue = getMaxValueFromRow(resultSet, i, type, resultColumnCurrentMax, dbAdapter.getName());
                             if (newMaxValue != null) {
+                                if (i == 2 && newMaxValue.equals(resultColumnCurrentMax))
+                                    // Something is very wrong here, one row (even if count is zero) should be returned
+                                    // records with column's value equal with resultColumnCurrentMax may can not be get until new records whose column's value large than resultColumnCurrentMax insert in
+                                    throw new SQLException("No rows returned from metadata query: " + selectQuery);
                                 statePropertyMap.put(fullyQualifiedStateKey, newMaxValue);
                             }
                         } catch (ParseException | IOException | ClassCastException pice) {
@@ -450,7 +454,7 @@ public class GenerateTableFetch extends AbstractDatabaseFetchProcessor {
                         Integer type = getColumnType(tableName, colName, dbAdapter);
 
                         // Add a condition for the WHERE clause
-                        maxValueClauses.add(colName + " <= " + getLiteralByType(type, maxValue, dbAdapter.getName()));
+                        maxValueClauses.add(colName + (index == 0 ? " < " : " <= ") + getLiteralByType(type, maxValue, dbAdapter.getName()));
                     }
                 });
 

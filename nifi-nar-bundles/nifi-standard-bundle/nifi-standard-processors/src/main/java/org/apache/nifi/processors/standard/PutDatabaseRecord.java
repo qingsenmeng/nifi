@@ -159,6 +159,16 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
             .allowableValues(UPDATE_TYPE, INSERT_TYPE, DELETE_TYPE, USE_ATTR_TYPE)
             .build();
 
+    static final PropertyDescriptor UPDATE_IF_INSERT_DUPLICATE_KEY = new PropertyDescriptor.Builder()
+            .name("update-db-if-insert-duplicate-key")
+            .displayName("Update If Insert Duplicate Key")
+            .description("if Statement Type is INSERT_TYPE, and this property is true, means that is insert operation failed for duplicated primary key, then update opertion is take effect and no " +
+                    "exception will be thrown" )
+            .required(false)
+            .allowableValues("true", "false")
+            .defaultValue("false")
+            .build();
+
     static final PropertyDescriptor DBCP_SERVICE = new PropertyDescriptor.Builder()
             .name("put-db-record-dcbp-service")
             .displayName("Database Connection Pooling Service")
@@ -303,6 +313,8 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
 
     private Cache<SchemaKey, TableSchema> schemaCache;
 
+    private volatile boolean updateIfInsertFailed = false;
+
     static {
         final Set<Relationship> r = new HashSet<>();
         r.add(REL_SUCCESS);
@@ -313,6 +325,7 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
         final List<PropertyDescriptor> pds = new ArrayList<>();
         pds.add(RECORD_READER_FACTORY);
         pds.add(STATEMENT_TYPE);
+        pds.add(UPDATE_IF_INSERT_DUPLICATE_KEY);
         pds.add(DBCP_SERVICE);
         pds.add(CATALOG_NAME);
         pds.add(SCHEMA_NAME);
@@ -410,12 +423,23 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
 
                 } else {
                     final DMLSettings settings = new DMLSettings(context);
-                    executeDML(context, session, inputFlowFile, functionContext, result, conn, recordParser, statementType, settings);
+                    try {
+                        executeDML(context, session, inputFlowFile, functionContext, result, conn, recordParser, statementType, settings);
+                    } catch (ProcessException pe) {
+                        getLogger().debug("exception for update {}", new Object[]{pe.getMessage()});
+                        if (updateIfInsertFailed && pe.getMessage().contains("duplicate key value")
+                                && INSERT_TYPE.equalsIgnoreCase(statementType)) {
+                            statementType = UPDATE_TYPE;
+                            try (final InputStream inForUpdate = session.read(inputFlowFile)) {
+                                final RecordReader recordParserForUpdate = recordParserFactory.createRecordReader(inputFlowFile, inForUpdate, getLogger());
+                                executeDML(context, session, inputFlowFile, functionContext, result, conn, recordParserForUpdate, statementType, settings);
+                            }
+                        }
+                    }
                 }
             }
 
         }, (fc, inputFlowFile, r, e) -> {
-
             getLogger().warn("Failed to process {} due to {}", new Object[]{inputFlowFile, e}, e);
 
             // Check if there was a BatchUpdateException or if multiple SQL statements were being executed and one failed
@@ -450,7 +474,10 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
         final int tableSchemaCacheSize = context.getProperty(TABLE_SCHEMA_CACHE_SIZE).asInteger();
         schemaCache = Caffeine.newBuilder()
                 .maximumSize(tableSchemaCacheSize)
+                .expireAfterWrite(30, TimeUnit.SECONDS)
                 .build();
+
+        updateIfInsertFailed = context.getProperty(UPDATE_IF_INSERT_DUPLICATE_KEY).asBoolean();
 
         process = new Put<>();
 
