@@ -425,15 +425,19 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                     final DMLSettings settings = new DMLSettings(context);
                     try {
                         executeDML(context, session, inputFlowFile, functionContext, result, conn, recordParser, statementType, settings);
-                    } catch (ProcessException pe) {
-                        getLogger().debug("exception for update {}", new Object[]{pe.getMessage()});
-                        if (updateIfInsertFailed && pe.getMessage().contains("duplicate key value")
+                    } catch (BatchUpdateException e) {
+                        getLogger().debug("exception may for update " + e.getMessage());
+                        if (updateIfInsertFailed && e.getMessage().contains("duplicate key value")
                                 && INSERT_TYPE.equalsIgnoreCase(statementType)) {
+                            conn.rollback();
                             statementType = UPDATE_TYPE;
-                            try (final InputStream inForUpdate = session.read(inputFlowFile)) {
+                            in.close();
+                            try (InputStream inForUpdate = session.read(inputFlowFile)) {
                                 final RecordReader recordParserForUpdate = recordParserFactory.createRecordReader(inputFlowFile, inForUpdate, getLogger());
                                 executeDML(context, session, inputFlowFile, functionContext, result, conn, recordParserForUpdate, statementType, settings);
                             }
+                        } else {
+                            throw e;
                         }
                     }
                 }
