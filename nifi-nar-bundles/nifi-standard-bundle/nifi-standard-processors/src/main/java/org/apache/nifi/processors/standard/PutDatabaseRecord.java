@@ -50,25 +50,14 @@ import org.apache.nifi.processor.util.pattern.RoutingResult;
 import org.apache.nifi.serialization.MalformedRecordException;
 import org.apache.nifi.serialization.RecordReader;
 import org.apache.nifi.serialization.RecordReaderFactory;
-import org.apache.nifi.serialization.record.DataType;
-import org.apache.nifi.serialization.record.Record;
-import org.apache.nifi.serialization.record.RecordField;
-import org.apache.nifi.serialization.record.RecordSchema;
+import org.apache.nifi.serialization.record.*;
 import org.apache.nifi.serialization.record.util.DataTypeUtils;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.postgresql.util.PGobject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.BatchUpdateException;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLDataException;
-import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
-import java.sql.SQLNonTransientException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -139,6 +128,8 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
             .build();
 
     protected static Set<Relationship> relationships;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Properties
     static final PropertyDescriptor RECORD_READER_FACTORY = new PropertyDescriptor.Builder()
@@ -725,29 +716,55 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                     if (fieldIndexes != null) {
                         for (int i = 0; i < fieldIndexes.size(); i++) {
                             final int currentFieldIndex = fieldIndexes.get(i);
-                            final Object currentValue = values[currentFieldIndex];
+                            Object currentValue = values[currentFieldIndex];
                             final DataType dataType = dataTypes.get(currentFieldIndex);
-                            final int sqlType = DataTypeUtils.getSQLTypeValue(dataType);
+                            int sqlType = DataTypeUtils.getSQLTypeValue(dataType);
 
                             // If DELETE type, insert the object twice because of the null check (see generateDelete for details)
                             if (DELETE_TYPE.equalsIgnoreCase(statementType)) {
                                 ps.setObject(i * 2 + 1, currentValue, sqlType);
                                 ps.setObject(i * 2 + 2, currentValue, sqlType);
                             } else {
+                                // 检查目标库是不是 postgreSQL, 对于复杂的Array和Record，设置为json类型
+                                if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
+                                    PGobject jsonObject = new PGobject();
+                                    jsonObject.setType("json");
+                                    if (currentValue instanceof MapRecord) {
+                                        MapRecord record = (MapRecord)currentValue;
+                                        jsonObject.setValue(objectMapper.writeValueAsString(record.toMap()));
+                                    } else {
+                                        jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
+                                    }
+                                    currentValue = jsonObject;
+                                    sqlType = Types.OTHER;
+                                }
                                 ps.setObject(i + 1, currentValue, sqlType);
                             }
                         }
                     } else {
                         // If there's no index map, assume all values are included and set them in order
                         for (int i = 0; i < values.length; i++) {
-                            final Object currentValue = values[i];
+                            Object currentValue = values[i];
                             final DataType dataType = dataTypes.get(i);
-                            final int sqlType = DataTypeUtils.getSQLTypeValue(dataType);
+                            int sqlType = DataTypeUtils.getSQLTypeValue(dataType);
                             // If DELETE type, insert the object twice because of the null check (see generateDelete for details)
                             if (DELETE_TYPE.equalsIgnoreCase(statementType)) {
                                 ps.setObject(i * 2 + 1, currentValue, sqlType);
                                 ps.setObject(i * 2 + 2, currentValue, sqlType);
                             } else {
+                                // 检查目标库是不是 postgreSQL, 对于复杂的Array和Record，设置为json类型
+                                if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
+                                    PGobject jsonObject = new PGobject();
+                                    jsonObject.setType("json");
+                                    if (currentValue instanceof MapRecord) {
+                                        MapRecord record = (MapRecord)currentValue;
+                                        jsonObject.setValue(objectMapper.writeValueAsString(record.toMap()));
+                                    } else {
+                                        jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
+                                    }
+                                    currentValue = jsonObject;
+                                    sqlType = Types.OTHER;
+                                }
                                 ps.setObject(i + 1, currentValue, sqlType);
                             }
                         }

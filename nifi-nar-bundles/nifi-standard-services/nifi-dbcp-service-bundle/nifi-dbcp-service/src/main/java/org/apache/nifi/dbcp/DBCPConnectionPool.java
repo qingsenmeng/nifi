@@ -241,7 +241,7 @@ public class DBCPConnectionPool extends AbstractControllerService implements DBC
             .name("kerberos-credentials-service")
             .displayName("Kerberos Credentials Service")
             .description("Specifies the Kerberos Credentials Controller Service that should be used for authenticating with Kerberos")
-            .identifiesControllerService(KerberosCredentialsService.class)
+//            .identifiesControllerService(KerberosCredentialsService.class)
             .required(false)
             .build();
 
@@ -317,7 +317,7 @@ public class DBCPConnectionPool extends AbstractControllerService implements DBC
         final Long timeBetweenEvictionRunsMillis = extractMillisWithInfinite(context.getProperty(EVICTION_RUN_PERIOD).evaluateAttributeExpressions());
         final Long minEvictableIdleTimeMillis = extractMillisWithInfinite(context.getProperty(MIN_EVICTABLE_IDLE_TIME).evaluateAttributeExpressions());
         final Long softMinEvictableIdleTimeMillis = extractMillisWithInfinite(context.getProperty(SOFT_MIN_EVICTABLE_IDLE_TIME).evaluateAttributeExpressions());
-        final KerberosCredentialsService kerberosCredentialsService = context.getProperty(KERBEROS_CREDENTIALS_SERVICE).asControllerService(KerberosCredentialsService.class);
+        final KerberosCredentialsService kerberosCredentialsService = null;//context.getProperty(KERBEROS_CREDENTIALS_SERVICE).asControllerService(KerberosCredentialsService.class);
 
         if (kerberosCredentialsService != null) {
             kerberosUser = new KerberosKeytabUser(kerberosCredentialsService.getPrincipal(), kerberosCredentialsService.getKeytab());
