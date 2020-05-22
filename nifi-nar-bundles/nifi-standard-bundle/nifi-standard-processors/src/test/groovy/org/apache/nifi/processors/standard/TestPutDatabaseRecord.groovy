@@ -18,6 +18,8 @@ package org.apache.nifi.processors.standard
 
 
 import org.apache.commons.dbcp2.DelegatingConnection
+import org.apache.nifi.dbcp.DBCPConnectionPool
+import org.apache.nifi.json.JsonTreeReader
 import org.apache.nifi.processor.exception.ProcessException
 import org.apache.nifi.processor.util.pattern.RollbackOnFailure
 import org.apache.nifi.reporting.InitializationException
@@ -70,7 +72,7 @@ class TestPutDatabaseRecord {
 
     TestRunner runner
     PutDatabaseRecord processor
-    DBCPServiceSimpleImpl dbcp
+    DBCPConnectionPool dbcp
 
     @BeforeClass
     static void setupBeforeClass() throws IOException {
@@ -105,9 +107,14 @@ class TestPutDatabaseRecord {
     void setUp() throws Exception {
         processor = new PutDatabaseRecord()
         //Mock the DBCP Controller Service so we can control the Results
-        dbcp = spy(new DBCPServiceSimpleImpl(DB_LOCATION))
-
+//        dbcp = spy(new DBCPServiceSimpleImpl(DB_LOCATION))
+        dbcp = new DBCPConnectionPool();
         final Map<String, String> dbcpProperties = new HashMap<>()
+        dbcpProperties.put(DBCPConnectionPool.DATABASE_URL.name, "jdbc:postgresql://10.0.197.127:5432/collect");
+        dbcpProperties.put(DBCPConnectionPool.DB_DRIVERNAME.name, "org.postgresql.Driver");
+        dbcpProperties.put(DBCPConnectionPool.DB_DRIVER_LOCATION.name, "/Users/guangp/Downloads/postgresql-42.2.12.jar");
+        dbcpProperties.put(DBCPConnectionPool.DB_USER.name, "postgres");
+        dbcpProperties.put(DBCPConnectionPool.DB_PASSWORD.name, "123qwe!@#");
 
         runner = TestRunners.newTestRunner(processor)
         runner.addControllerService("dbcp", dbcp, dbcpProperties)
@@ -227,26 +234,27 @@ class TestPutDatabaseRecord {
 
     @Test
     void testInsert() throws InitializationException, ProcessException, SQLException, IOException {
-        recreateTable("PERSONS", createPersons)
-        final MockRecordParser parser = new MockRecordParser()
-        runner.addControllerService("parser", parser)
-        runner.enableControllerService(parser)
+//        recreateTable("PERSONS", createPersons)
+//        final MockRecordParser parser = new MockRecordParser()
+        JsonTreeReader reader = new JsonTreeReader()
+        runner.addControllerService("parser", reader)
+        runner.enableControllerService(reader)
 
-        parser.addSchemaField("id", RecordFieldType.INT)
-        parser.addSchemaField("name", RecordFieldType.STRING)
-        parser.addSchemaField("code", RecordFieldType.INT)
-
-        parser.addRecord(1, 'rec1', 101)
-        parser.addRecord(2, 'rec2', 102)
-        parser.addRecord(3, 'rec3', 103)
-        parser.addRecord(4, 'rec4', 104)
-        parser.addRecord(5, null, 105)
+//        parser.addSchemaField("id", RecordFieldType.INT)
+//        parser.addSchemaField("name", RecordFieldType.STRING)
+//        parser.addSchemaField("code", RecordFieldType.INT)
+//
+//        parser.addRecord(1, 'rec1', 101)
+//        parser.addRecord(2, 'rec2', 102)
+//        parser.addRecord(3, 'rec3', 103)
+//        parser.addRecord(4, 'rec4', 104)
+//        parser.addRecord(5, null, 105)
 
         runner.setProperty(PutDatabaseRecord.RECORD_READER_FACTORY, 'parser')
         runner.setProperty(PutDatabaseRecord.STATEMENT_TYPE, PutDatabaseRecord.INSERT_TYPE)
-        runner.setProperty(PutDatabaseRecord.TABLE_NAME, 'PERSONS')
+        runner.setProperty(PutDatabaseRecord.TABLE_NAME, 'app_labor_geo_segment')
 
-        runner.enqueue(new byte[0])
+        runner.enqueue("{\"id\":\"5e72c57be0905418b5c9e903\",\"clazz\":\"com.glodon.glm.locationservice.geo.GeoSegment\",\"geo_line_string\":{\"type\":\"LineString\",\"coordinates\":[[116.27887366136069,40.04993606881609],[116.27985980903645,40.04589404882148],[116.28071811874146,40.04172116877075],[116.28118972842549,40.0394206744062],[116.28127458477952,40.039584554397656]]},\"graph_type\":0,\"width\":1000.0,\"points\":[{\"lat\":40.051181,\"lng\":116.284941},{\"lat\":40.04714,\"lng\":116.285928},{\"lat\":40.042968,\"lng\":116.286787},{\"lat\":40.040668,\"lng\":116.287259},{\"lat\":40.040832,\"lng\":116.287344}]}")
         runner.run()
 
         runner.assertTransferCount(PutDatabaseRecord.REL_SUCCESS, 1)

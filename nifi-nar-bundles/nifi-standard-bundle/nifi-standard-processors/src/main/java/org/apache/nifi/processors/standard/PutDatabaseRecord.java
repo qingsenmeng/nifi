@@ -16,6 +16,12 @@
  */
 package org.apache.nifi.processors.standard;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.commons.lang3.StringUtils;
@@ -52,7 +58,6 @@ import org.apache.nifi.serialization.RecordReader;
 import org.apache.nifi.serialization.RecordReaderFactory;
 import org.apache.nifi.serialization.record.*;
 import org.apache.nifi.serialization.record.util.DataTypeUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.postgresql.util.PGobject;
 
 import java.io.IOException;
@@ -129,7 +134,14 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
 
     protected static Set<Relationship> relationships;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final static ObjectMapper objectMapper;
+
+    static {
+        objectMapper = new ObjectMapper();
+        SimpleModule module = new SimpleModule();
+        module.addSerializer(MapRecord.class, new MapRecordSerializer());
+        objectMapper.registerModule(module);
+    }
 
     // Properties
     static final PropertyDescriptor RECORD_READER_FACTORY = new PropertyDescriptor.Builder()
@@ -729,12 +741,8 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                                 if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
                                     PGobject jsonObject = new PGobject();
                                     jsonObject.setType("json");
-                                    if (currentValue instanceof MapRecord) {
-                                        MapRecord record = (MapRecord)currentValue;
-                                        jsonObject.setValue(objectMapper.writeValueAsString(record.toMap()));
-                                    } else {
-                                        jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
-                                    }
+                                    jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
+
                                     currentValue = jsonObject;
                                     sqlType = Types.OTHER;
                                 }
@@ -756,12 +764,8 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                                 if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
                                     PGobject jsonObject = new PGobject();
                                     jsonObject.setType("json");
-                                    if (currentValue instanceof MapRecord) {
-                                        MapRecord record = (MapRecord)currentValue;
-                                        jsonObject.setValue(objectMapper.writeValueAsString(record.toMap()));
-                                    } else {
-                                        jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
-                                    }
+                                    jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
+
                                     currentValue = jsonObject;
                                     sqlType = Types.OTHER;
                                 }
@@ -787,6 +791,18 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
             result.routeTo(flowFile, REL_SUCCESS);
             session.getProvenanceReporter().send(flowFile, functionContext.jdbcUrl);
 
+        }
+    }
+
+    private static class MapRecordSerializer extends JsonSerializer<MapRecord> {
+
+        @Override
+        public void serialize(MapRecord value, JsonGenerator jgen, SerializerProvider provider) throws IOException {
+            jgen.writeStartObject();
+            for (Map.Entry<String, Object> e : value.toMap().entrySet()){
+                jgen.writeObjectField(e.getKey(), e.getValue());
+            }
+            jgen.writeEndObject();
         }
     }
 
