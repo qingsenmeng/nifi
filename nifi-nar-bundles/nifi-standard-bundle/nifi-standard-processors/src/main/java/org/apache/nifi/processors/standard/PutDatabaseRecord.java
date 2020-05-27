@@ -1086,9 +1086,9 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                     //   (column = ? OR (column is null AND ? is null))
                     sqlBuilder.append("(");
                     sqlBuilder.append(columnName);
-                    sqlBuilder.append(" = ? OR (");
+                    sqlBuilder.append(" = ? OR ");
                     sqlBuilder.append(columnName);
-                    sqlBuilder.append(" is null AND ? is null))");
+                    sqlBuilder.append(" is null)");
                     includedColumns.add(i);
 
                 }
