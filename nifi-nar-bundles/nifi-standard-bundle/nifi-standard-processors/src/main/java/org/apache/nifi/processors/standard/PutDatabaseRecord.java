@@ -734,8 +734,9 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
 
                             // If DELETE type, insert the object twice because of the null check (see generateDelete for details)
                             if (DELETE_TYPE.equalsIgnoreCase(statementType)) {
-                                ps.setObject(i * 2 + 1, currentValue, sqlType);
-                                ps.setObject(i * 2 + 2, currentValue, sqlType);
+                                ps.setObject(i + 1, currentValue, sqlType);
+                                /*ps.setObject(i * 2 + 1, currentValue, sqlType);
+                                ps.setObject(i * 2 + 2, currentValue, sqlType);*/
                             } else {
                                 // 检查目标库是不是 postgreSQL, 对于复杂的Array和Record，设置为json类型
                                 if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
@@ -757,8 +758,9 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                             int sqlType = DataTypeUtils.getSQLTypeValue(dataType);
                             // If DELETE type, insert the object twice because of the null check (see generateDelete for details)
                             if (DELETE_TYPE.equalsIgnoreCase(statementType)) {
-                                ps.setObject(i * 2 + 1, currentValue, sqlType);
-                                ps.setObject(i * 2 + 2, currentValue, sqlType);
+                                ps.setObject(i + 1, currentValue, sqlType);
+                               /* ps.setObject(i * 2 + 1, currentValue, sqlType);
+                                ps.setObject(i * 2 + 2, currentValue, sqlType);*/
                             } else {
                                 // 检查目标库是不是 postgreSQL, 对于复杂的Array和Record，设置为json类型
                                 if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
