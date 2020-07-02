@@ -430,7 +430,12 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                         executeDML(context, session, inputFlowFile, functionContext, result, conn, recordParser, statementType, settings);
                     } catch (BatchUpdateException e) {
                         getLogger().debug("exception may for update " + e.getMessage());
-                        if (updateIfInsertFailed && e.getMessage().contains("duplicate key value")
+                        if (updateIfInsertFailed &&
+                                (
+                                    e.getMessage().contains("duplicate key value") // postgre
+                                        || e.getMessage().contains("Duplicate entry") // MySQL
+                                        || StringUtils.containsIgnoreCase(e.getMessage(), "duplicate") // others
+                                )
                                 && INSERT_TYPE.equalsIgnoreCase(statementType)) {
                             conn.rollback();
                             statementType = UPDATE_TYPE;
@@ -739,7 +744,8 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                                 ps.setObject(i * 2 + 2, currentValue, sqlType);*/
                             } else {
                                 // 检查目标库是不是 postgreSQL, 对于复杂的Array和Record，设置为json类型
-                                if (con.getClientInfo("ApplicationName").contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
+                                String appName = con.getClientInfo("ApplicationName");
+                                if (StringUtils.isNotBlank(appName) && appName.contains("PostgreSQL") && (sqlType == Types.STRUCT || sqlType == Types.ARRAY)) {
                                     PGobject jsonObject = new PGobject();
                                     jsonObject.setType("json");
                                     jsonObject.setValue(objectMapper.writeValueAsString(currentValue));
