@@ -110,11 +110,11 @@ class TestPutDatabaseRecord {
 //        dbcp = spy(new DBCPServiceSimpleImpl(DB_LOCATION))
         dbcp = new DBCPConnectionPool();
         final Map<String, String> dbcpProperties = new HashMap<>()
-        dbcpProperties.put(DBCPConnectionPool.DATABASE_URL.name, "jdbc:postgresql://10.0.197.127:5432/collect");
-        dbcpProperties.put(DBCPConnectionPool.DB_DRIVERNAME.name, "org.postgresql.Driver");
-        dbcpProperties.put(DBCPConnectionPool.DB_DRIVER_LOCATION.name, "/Users/guangp/Downloads/postgresql-42.2.12.jar");
-        dbcpProperties.put(DBCPConnectionPool.DB_USER.name, "postgres");
-        dbcpProperties.put(DBCPConnectionPool.DB_PASSWORD.name, "123qwe!@#");
+        dbcpProperties.put(DBCPConnectionPool.DATABASE_URL.name, "jdbc:mysql://10.0.197.127:3306/collect?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true");
+        dbcpProperties.put(DBCPConnectionPool.DB_DRIVERNAME.name, "com.mysql.jdbc.Driver");
+        dbcpProperties.put(DBCPConnectionPool.DB_DRIVER_LOCATION.name, "/Users/guangp/Downloads/mysql-connector-java-5.1.47.jar");
+        dbcpProperties.put(DBCPConnectionPool.DB_USER.name, "collect");
+        dbcpProperties.put(DBCPConnectionPool.DB_PASSWORD.name, "collect.c0m");
 
         runner = TestRunners.newTestRunner(processor)
         runner.addControllerService("dbcp", dbcp, dbcpProperties)
@@ -252,9 +252,10 @@ class TestPutDatabaseRecord {
 
         runner.setProperty(PutDatabaseRecord.RECORD_READER_FACTORY, 'parser')
         runner.setProperty(PutDatabaseRecord.STATEMENT_TYPE, PutDatabaseRecord.INSERT_TYPE)
-        runner.setProperty(PutDatabaseRecord.TABLE_NAME, 'app_labor_geo_segment')
+        runner.setProperty(PutDatabaseRecord.TABLE_NAME, 'src_test')
+        runner.setProperty(PutDatabaseRecord.UPDATE_IF_INSERT_DUPLICATE_KEY, 'true')
 
-        runner.enqueue("{\"id\":\"5e72c57be0905418b5c9e903\",\"clazz\":\"com.glodon.glm.locationservice.geo.GeoSegment\",\"geo_line_string\":{\"type\":\"LineString\",\"coordinates\":[[116.27887366136069,40.04993606881609],[116.27985980903645,40.04589404882148],[116.28071811874146,40.04172116877075],[116.28118972842549,40.0394206744062],[116.28127458477952,40.039584554397656]]},\"graph_type\":0,\"width\":1000.0,\"points\":[{\"lat\":40.051181,\"lng\":116.284941},{\"lat\":40.04714,\"lng\":116.285928},{\"lat\":40.042968,\"lng\":116.286787},{\"lat\":40.040668,\"lng\":116.287259},{\"lat\":40.040832,\"lng\":116.287344}]}")
+        runner.enqueue("{\"id\":2,\"update_time\":\"2020-06-30 14:40:39\"}")
         runner.run()
 
         runner.assertTransferCount(PutDatabaseRecord.REL_SUCCESS, 1)
