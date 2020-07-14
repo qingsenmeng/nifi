@@ -701,7 +701,7 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
             sqlHolder = generateUpdate(recordSchema, fqTableName, updateKeys, tableSchema, settings);
 
         } else if (DELETE_TYPE.equalsIgnoreCase(statementType)) {
-            sqlHolder = generateDelete(recordSchema, fqTableName, tableSchema, settings);
+            sqlHolder = generateDelete(recordSchema, fqTableName, updateKeys, tableSchema, settings);
 
         } else {
             throw new IllegalArgumentException(format("Statement Type %s is not valid, FlowFile %s", statementType, flowFile));
@@ -1033,7 +1033,7 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
         return new SqlAndIncludedColumns(sqlBuilder.toString(), includedColumns);
     }
 
-    SqlAndIncludedColumns generateDelete(final RecordSchema recordSchema, final String tableName, final TableSchema tableSchema, final DMLSettings settings)
+    SqlAndIncludedColumns generateDelete(final RecordSchema recordSchema, final String tableName,final String updateKeys, final TableSchema tableSchema, final DMLSettings settings)
             throws IllegalArgumentException, MalformedRecordException, SQLDataException {
 
         final Set<String> normalizedFieldNames = getNormalizedColumnNames(recordSchema, settings.translateFieldNames);
@@ -1068,6 +1068,16 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
             int fieldCount = fieldNames.size();
             AtomicInteger fieldsFound = new AtomicInteger(0);
 
+            final Set<String> updateKeyNames;
+            if (updateKeys == null || updateKeys.length()==0) {
+                updateKeyNames = tableSchema.getPrimaryKeyColumnNames();
+            } else {
+                updateKeyNames = new HashSet<>();
+                for (final String updateKey : updateKeys.split(",")) {
+                    updateKeyNames.add(updateKey.trim());
+                }
+            }
+
             for (int i = 0; i < fieldCount; i++) {
 
                 RecordField field = recordSchema.getField(i);
@@ -1079,15 +1089,18 @@ public class PutDatabaseRecord extends AbstractSessionFactoryProcessor {
                 }
 
                 if (desc != null) {
-                    if (fieldsFound.getAndIncrement() > 0) {
-                        sqlBuilder.append(" AND ");
-                    }
 
                     String columnName;
                     if (settings.escapeColumnNames) {
                         columnName = tableSchema.getQuotedIdentifierString() + desc.getColumnName() + tableSchema.getQuotedIdentifierString();
                     } else {
                         columnName = desc.getColumnName();
+                    }
+                    if(updateKeyNames!=null && updateKeyNames.size()>0 && !updateKeyNames.contains(columnName.toLowerCase())){
+                        continue;
+                    }
+                    if (fieldsFound.getAndIncrement() > 0) {
+                        sqlBuilder.append(" AND ");
                     }
                     // Need to build a null-safe construct for the WHERE clause, since we are using PreparedStatement and won't know if the values are null. If they are null,
                     // then the filter should be "column IS null" vs "column = null". Since we don't know whether the value is null, we can use the following construct (from NIFI-3742):
