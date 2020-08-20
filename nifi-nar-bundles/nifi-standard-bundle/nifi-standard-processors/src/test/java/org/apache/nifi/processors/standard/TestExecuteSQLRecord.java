@@ -24,6 +24,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.nifi.avro.AvroRecordSetWriter;
 import org.apache.nifi.controller.AbstractControllerService;
+import org.apache.nifi.dbcp.DBCPConnectionPool;
 import org.apache.nifi.dbcp.DBCPService;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.flowfile.attributes.FragmentAttributes;
@@ -423,6 +424,44 @@ public class TestExecuteSQLRecord {
     }
 
     @Test
+    public void testOralceSelect() throws Exception{
+
+        final DBCPConnectionPool service = new DBCPConnectionPool();
+        runner.addControllerService("dbcp", service);
+
+        runner.setProperty(service, DBCPConnectionPool.DATABASE_URL, "jdbc:oracle:thin:@//10.0.197.127:1521/xe");
+        runner.setProperty(service, DBCPConnectionPool.DB_USER, "system");
+        runner.setProperty(service, DBCPConnectionPool.DB_PASSWORD, "oracle");
+        runner.setProperty(service, DBCPConnectionPool.DB_DRIVERNAME, "oracle.jdbc.driver.OracleDriver");
+        runner.setProperty(service, DBCPConnectionPool.DB_DRIVER_LOCATION, "/Users/mengqs/ojdbc6-11.2.0.3.jar");
+/*        runner.setProperty(service, DBCPConnectionPool.MAX_WAIT_TIME, "-1");
+        runner.setProperty(service, DBCPConnectionPool.MAX_IDLE, "6");
+        runner.setProperty(service, DBCPConnectionPool.MIN_IDLE, "4");
+        runner.setProperty(service, DBCPConnectionPool.MAX_CONN_LIFETIME, "1 secs");
+        runner.setProperty(service, DBCPConnectionPool.EVICTION_RUN_PERIOD, "1 secs");
+        runner.setProperty(service, DBCPConnectionPool.MIN_EVICTABLE_IDLE_TIME, "1 secs");
+        runner.setProperty(service, DBCPConnectionPool.SOFT_MIN_EVICTABLE_IDLE_TIME, "1 secs");*/
+
+        runner.enableControllerService(service);
+
+        runner.setProperty(AbstractExecuteSQL.DBCP_SERVICE, "dbcp");
+        runner.setIncomingConnection(true);
+        runner.setProperty(ExecuteSQLRecord.SQL_SELECT_QUERY, "${query}");
+        MockRecordWriter recordWriter = new MockRecordWriter(null, true, -1);
+        runner.addControllerService("writer", recordWriter);
+        runner.setProperty(ExecuteSQLRecord.RECORD_WRITER_FACTORY, "writer");
+        runner.enableControllerService(recordWriter);
+        Map<String,String> datas = new HashMap<>();
+        datas.put("query","select * from TEST.\"src\"");
+        runner.enqueue("Hello".getBytes(),datas);
+        runner.run();
+        runner.assertAllFlowFilesTransferred(ExecuteSQLRecord.REL_SUCCESS, 1);
+        MockFlowFile firstFlowFile = runner.getFlowFilesForRelationship(ExecuteSQLRecord.REL_SUCCESS).get(0);
+        firstFlowFile.assertAttributeEquals(ExecuteSQLRecord.RESULT_ROW_COUNT, "0");
+        firstFlowFile.assertContentEquals("");
+    }
+
+    @Test
     public void testNoRowsStatementCreatesEmptyFlowFile() throws Exception {
         // remove previous test database, if any
         final File dbLocation = new File(DB_LOCATION);
@@ -732,6 +771,8 @@ public class TestExecuteSQLRecord {
                 final Connection con;
                 if ("h2".equalsIgnoreCase(type)) {
                     con = DriverManager.getConnection("jdbc:h2:file:" + "./target/testdb7");
+                }else if("oracle".equalsIgnoreCase(type)){
+                    con = DriverManager.getConnection("jdbc:oracle:thin:@//10.0.197.127:1521/xe");
                 } else {
                     Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
                     con = DriverManager.getConnection("jdbc:derby:" + DB_LOCATION + ";create=true");

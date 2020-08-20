@@ -25,5 +25,6 @@
     <modules>
         <module>nifi-cdc-api</module>
         <module>nifi-cdc-mysql-bundle</module>
+        <module>nifi-cdc-postgresql-bundle</module>
     </modules>
 </project>

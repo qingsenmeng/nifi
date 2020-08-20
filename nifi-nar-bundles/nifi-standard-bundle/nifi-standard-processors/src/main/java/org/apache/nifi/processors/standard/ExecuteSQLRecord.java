@@ -119,6 +119,7 @@ public class ExecuteSQLRecord extends AbstractExecuteSQL {
             .build();
 
     public ExecuteSQLRecord() {
+        System.getProperties().setProperty("oracle.jdbc.J2EE13Compliant", "true");
         final Set<Relationship> r = new HashSet<>();
         r.add(REL_SUCCESS);
         r.add(REL_FAILURE);

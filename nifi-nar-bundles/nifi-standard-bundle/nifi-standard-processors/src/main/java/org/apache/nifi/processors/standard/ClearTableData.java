@@ -75,7 +75,7 @@ import java.util.*;
 })
 public class ClearTableData extends AbstractProcessor {
 
-    private static final String defaultDeleteSqlPattern = "truncate ${tableName}";
+    private static final String defaultDeleteSqlPattern = "truncate table ${tableName}";
 
     public static final String RESULT_ERROR_MESSAGE = "executesql.error.message";
 

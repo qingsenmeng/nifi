@@ -1150,6 +1150,9 @@ public class DataTypeUtils {
             }
         }
 
+        // TODO:oracle.sql.TIMESTAMP to Timestamp
+
+
         throw new IllegalTypeConversionException("Cannot convert value [" + value + "] of type " + value.getClass() + " to Timestamp for field " + fieldName);
     }
 

@@ -83,7 +83,7 @@ class CaptureChangeMySQLTest {
     void setUp() throws Exception {
         processor = new MockCaptureChangeMySQL()
         testRunner = TestRunners.newTestRunner(processor)
-        client = new MockBinlogClient('localhost', 3306, 'root', 'password')
+        client = new MockBinlogClient('localhost', 3306, 'root', '19840208mqs')
     }
 
     @After
@@ -535,8 +535,10 @@ class CaptureChangeMySQLTest {
         testRunner.setProperty(CaptureChangeMySQL.DRIVER_LOCATION, 'file:///path/to/mysql-connector-java-5.1.38-bin.jar')
         testRunner.setProperty(CaptureChangeMySQL.HOSTS, 'localhost:3306')
         testRunner.setProperty(CaptureChangeMySQL.USERNAME, 'root')
-        testRunner.setProperty(CaptureChangeMySQL.PASSWORD, 'password')
+        testRunner.setProperty(CaptureChangeMySQL.PASSWORD, '19840208mqs')
         testRunner.setProperty(CaptureChangeMySQL.CONNECT_TIMEOUT, '2 seconds')
+        testRunner.setProperty(CaptureChangeMySQL.DATABASE_NAME_PATTERN, "test_\\d*")
+        testRunner.setProperty(CaptureChangeMySQL.TABLE_NAME_PATTERN, "t_mix_machine_bill")
         final DistributedMapCacheClientImpl cacheClient = createCacheClient()
         def clientProperties = [:]
         clientProperties.put(DistributedMapCacheClientService.HOSTNAME.getName(), 'localhost')
@@ -579,10 +581,10 @@ class CaptureChangeMySQLTest {
         testRunner.setProperty(CaptureChangeMySQL.DRIVER_LOCATION, 'file:///path/to/mysql-connector-java-5.1.38-bin.jar')
         testRunner.setProperty(CaptureChangeMySQL.HOSTS, 'localhost:3306')
         testRunner.setProperty(CaptureChangeMySQL.USERNAME, 'root')
-        testRunner.setProperty(CaptureChangeMySQL.PASSWORD, 'password')
+        testRunner.setProperty(CaptureChangeMySQL.PASSWORD, '19840208mqs')
         testRunner.setProperty(CaptureChangeMySQL.CONNECT_TIMEOUT, '2 seconds')
-        testRunner.setProperty(CaptureChangeMySQL.DATABASE_NAME_PATTERN, "myDB")
-        testRunner.setProperty(CaptureChangeMySQL.TABLE_NAME_PATTERN, "user")
+        testRunner.setProperty(CaptureChangeMySQL.DATABASE_NAME_PATTERN, "test_\\d*")
+        testRunner.setProperty(CaptureChangeMySQL.TABLE_NAME_PATTERN, "t_mix_machine_bill")
         testRunner.setProperty(CaptureChangeMySQL.INCLUDE_BEGIN_COMMIT, 'true')
 
         testRunner.run(1, false, true)
