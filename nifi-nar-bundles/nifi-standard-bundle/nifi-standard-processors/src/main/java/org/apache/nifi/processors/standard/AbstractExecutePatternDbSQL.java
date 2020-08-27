@@ -67,6 +67,8 @@ public abstract class AbstractExecutePatternDbSQL extends AbstractProcessor {
     public static final String RESULT_ERROR_MESSAGE = "executesql.error.message";
     public static final String INPUT_FLOWFILE_UUID = "input.flowfile.uuid";
 
+    public static final String SQL_PARAMS_DEFAULT="Unicode=true&characterEncoding=UTF-8&tinyInt1isBit=false&zeroDateTimeBehavior=convertToNull&useCursorFetch=true&defaultFetchSize=100";
+
     public static final String FRAGMENT_ID = FragmentAttributes.FRAGMENT_ID.key();
     public static final String FRAGMENT_INDEX = FragmentAttributes.FRAGMENT_INDEX.key();
     public static final String FRAGMENT_COUNT = FragmentAttributes.FRAGMENT_COUNT.key();
@@ -123,6 +125,7 @@ public abstract class AbstractExecutePatternDbSQL extends AbstractProcessor {
             .displayName("Database Url Params")
             .description("Url Params. ")
             .required(false)
+            .defaultValue(SQL_PARAMS_DEFAULT)
             .addValidator(StandardValidators.NON_EMPTY_EL_VALIDATOR)
             .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
             .build();

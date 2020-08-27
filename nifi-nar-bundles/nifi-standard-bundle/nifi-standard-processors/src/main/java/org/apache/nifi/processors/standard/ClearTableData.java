@@ -200,7 +200,7 @@ public class ClearTableData extends AbstractProcessor {
         if((StringUtils.isEmpty(clearTableDataFlag) || !Boolean.valueOf(clearTableDataFlag)) &&  !StringUtils.isEmpty(isTruncateTable) && Boolean.valueOf(isTruncateTable)) {
             Map<String, String> generatedAttributes = new HashMap<String, String>();
             generatedAttributes.put(TABLE_NAME_KEY, tableName);
-            String selectQuery = Strings.replaceVariables(context.getProperty(SQL_DELETE).getValue(), generatedAttributes::get);
+            String selectQuery = context.getProperty(SQL_DELETE).evaluateAttributeExpressions(fileToProcess,generatedAttributes).getValue();
 
             try (final Connection con = dbcpService.getConnection(fileToProcess == null ? Collections.emptyMap() : fileToProcess.getAttributes());
                  final PreparedStatement st = con.prepareStatement(selectQuery)) {

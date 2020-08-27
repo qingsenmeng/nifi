@@ -116,10 +116,13 @@ public class TestClearTableData {
         }
 
         runner.setIncomingConnection(true);
-        runner.setProperty(ClearTableData.SQL_DELETE, "delete from ${tableName}");
+        runner.setProperty(ClearTableData.SQL_DELETE, "delete from ${tableName} where id=${pro_id}");
         runner.setProperty(ClearTableData.TABLE_NAME, "TEST_NULL_INT");
         runner.setProperty(ClearTableData.IS_TRUNCATE_TABLE, "true");
         MockFlowFile flowFile1 = new MockFlowFile(1);
+        Map<String,String> attributes = new HashMap<>();
+        attributes.put("pro_id","1");
+        flowFile1.putAttributes(attributes);
         runner.enqueue(flowFile1);
         runner.run();
         MockFlowFile flowFile2 = new MockFlowFile(2);
