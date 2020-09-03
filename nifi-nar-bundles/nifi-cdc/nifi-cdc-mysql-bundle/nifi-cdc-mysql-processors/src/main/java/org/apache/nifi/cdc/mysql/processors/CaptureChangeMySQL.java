@@ -99,6 +99,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -177,6 +178,26 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
             .description("The maximum amount of time allowed for a connection to be established, zero means there is effectively no limit.")
             .defaultValue("30 seconds")
             .required(true)
+            .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+            .build();
+
+    public static final PropertyDescriptor MAX_QUEUE_SIZE = new PropertyDescriptor.Builder()
+            .name("capture-change-mysql-max-queue-size")
+            .displayName("Max Queue Size")
+            .description("The maximum size of the buffer queue. This queue is used as an intermediate storage until the scheduled thread polls to consume from it.")
+            .defaultValue("100000")
+            .required(false)
+            .addValidator(StandardValidators.NON_NEGATIVE_INTEGER_VALIDATOR)
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
+            .build();
+
+    public static final PropertyDescriptor MAX_QUEUE_OFFER_TIMEOUT = new PropertyDescriptor.Builder()
+            .name("capture-change-mysql-max-queue-offer-timeout")
+            .displayName("Max Queue Offer Time")
+            .description("The maximum amount of time allowed to wait for the intermediate queue space to be available, before received bin log events are discarded.")
+            .defaultValue("60 seconds")
+            .required(false)
             .addValidator(StandardValidators.TIME_PERIOD_VALIDATOR)
             .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
             .build();
@@ -369,7 +390,7 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
             .displayName("Mysql Connection Try Count")
             .description("When Mysql Connection Error happend,will try to connect again under this speccified times")
             .required(false)
-            .defaultValue("0")
+            .defaultValue("3")
             .addValidator(StandardValidators.NON_NEGATIVE_INTEGER_VALIDATOR)
             .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
             .build();
@@ -393,7 +414,7 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
     private BinlogLifecycleListener lifecycleListener;
     private GtidSet gtidSet;
 
-    private volatile LinkedBlockingQueue<RawBinlogEvent> queue = new LinkedBlockingQueue<>();
+    private volatile BlockingQueue<RawBinlogEvent> queue;
     private volatile String currentBinlogFile = null;
     private volatile long currentBinlogPosition = 4;
     private volatile String currentGtidSet = null;
@@ -458,6 +479,8 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
         pds.add(TABLE_NAME_PATTERN);
         pds.add(CONNECT_TIMEOUT);
         pds.add(DIST_CACHE_CLIENT);
+        pds.add(MAX_QUEUE_SIZE);
+        pds.add(MAX_QUEUE_OFFER_TIMEOUT);
         pds.add(RETRIEVE_ALL_RECORDS);
         pds.add(INCLUDE_BEGIN_COMMIT);
         pds.add(INCLUDE_DDL_EVENTS);
@@ -511,6 +534,10 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
 
         includeBeginCommit = context.getProperty(INCLUDE_BEGIN_COMMIT).asBoolean();
         includeDDLEvents = context.getProperty(INCLUDE_DDL_EVENTS).asBoolean();
+        int maxQueueSize = context.getProperty(MAX_QUEUE_SIZE).evaluateAttributeExpressions().asInteger();
+
+        long maxQueueOfferTimeout = context.getProperty(MAX_QUEUE_OFFER_TIMEOUT).evaluateAttributeExpressions().asTimePeriod(TimeUnit.MILLISECONDS);
+
         useGtid = context.getProperty(USE_BINLOG_GTID).asBoolean();
 
         if (useGtid) {
@@ -603,7 +630,7 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
 
             Long serverId = context.getProperty(SERVER_ID).evaluateAttributeExpressions().asLong();
 
-            connect(hosts, username, password, serverId, createEnrichmentConnection, driverLocation, driverName, connectTimeout);
+            connect(hosts, username, password, serverId, createEnrichmentConnection, driverLocation, driverName, connectTimeout, maxQueueSize, maxQueueOfferTimeout);
         } catch (IOException | IllegalStateException e) {
             context.yield();
             binlogClient = null;
@@ -738,7 +765,7 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
     }
 
     protected void connect(List<InetSocketAddress> hosts, String username, String password, Long serverId, boolean createEnrichmentConnection,
-                           String driverLocation, String driverName, long connectTimeout) throws IOException {
+                           String driverLocation, String driverName, long connectTimeout, int maxQueueSize, long maxQueueOfferTimeout) throws IOException {
 
         int connectionAttempts = 0;
         final int numHosts = hosts.size();
@@ -767,7 +794,8 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
 
             // Add an event listener and lifecycle listener for binlog and client events, respectively
             if (eventListener == null) {
-                eventListener = createBinlogEventListener(binlogClient, queue);
+                queue = new LinkedBlockingQueue<>(maxQueueSize);
+                eventListener = createBinlogEventListener(binlogClient, queue, maxQueueOfferTimeout);
             }
             eventListener.start();
             binlogClient.registerEventListener(eventListener);
@@ -1114,8 +1142,8 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
      * @param q      A queue used to communicate events between the listener and the NiFi processor thread.
      * @return A BinlogEventListener instance, which will be notified of events associated with the specified client
      */
-    BinlogEventListener createBinlogEventListener(BinaryLogClient client, LinkedBlockingQueue<RawBinlogEvent> q) {
-        return new BinlogEventListener(client, q);
+    BinlogEventListener createBinlogEventListener(BinaryLogClient client, BlockingQueue<RawBinlogEvent> q, long maxOfferTimeout) {
+        return new BinlogEventListener(client, q,maxOfferTimeout);
     }
 
     /**
