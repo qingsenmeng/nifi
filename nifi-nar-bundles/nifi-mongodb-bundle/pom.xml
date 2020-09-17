@@ -57,6 +57,12 @@
                 <mongo.driver.version>3.8.0</mongo.driver.version>
             </properties>
         </profile>
+        <profile>
+            <id>3.12</id>
+            <properties>
+                <mongo.driver.version>3.12.7</mongo.driver.version>
+            </properties>
+        </profile>
     </profiles>
 
     <dependencyManagement>
