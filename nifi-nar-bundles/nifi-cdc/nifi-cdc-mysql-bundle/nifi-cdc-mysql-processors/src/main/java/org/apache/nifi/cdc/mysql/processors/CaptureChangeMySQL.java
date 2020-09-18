@@ -18,13 +18,7 @@ package org.apache.nifi.cdc.mysql.processors;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.GtidSet;
-import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.GtidEventData;
-import com.github.shyiko.mysql.binlog.event.QueryEventData;
-import com.github.shyiko.mysql.binlog.event.RotateEventData;
-import com.github.shyiko.mysql.binlog.event.TableMapEventData;
+import com.github.shyiko.mysql.binlog.event.*;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.Stateful;
@@ -1048,10 +1042,13 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
 
                     } else {
                         // Update event
-                        UpdateRowsEventInfo eventInfo = useGtid
-                                ? new UpdateRowsEventInfo(currentTable, timestamp, currentGtidSet, event.getData())
-                                : new UpdateRowsEventInfo(currentTable, timestamp, currentBinlogFile, currentBinlogPosition, event.getData());
-                        currentSequenceId.set(updateRowsWriter.writeEvent(currentSession, transitUri, eventInfo, currentSequenceId.get(), REL_SUCCESS));
+                        UpdateRowsEventData updateRowsEventData = event.getData();
+                        if(currentTable.getTableId()==null || updateRowsEventData.getTableId() == currentTable.getTableId().longValue()) {
+                            UpdateRowsEventInfo eventInfo = useGtid
+                                    ? new UpdateRowsEventInfo(currentTable, timestamp, currentGtidSet, event.getData())
+                                    : new UpdateRowsEventInfo(currentTable, timestamp, currentBinlogFile, currentBinlogPosition, event.getData());
+                            currentSequenceId.set(updateRowsWriter.writeEvent(currentSession, transitUri, eventInfo, currentSequenceId.get(), REL_SUCCESS));
+                        }
                     }
                     break;
 
