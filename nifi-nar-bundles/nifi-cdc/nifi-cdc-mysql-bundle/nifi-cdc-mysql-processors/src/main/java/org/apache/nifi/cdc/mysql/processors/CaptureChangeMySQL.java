@@ -625,6 +625,7 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
             Long serverId = context.getProperty(SERVER_ID).evaluateAttributeExpressions().asLong();
 
             connect(hosts, username, password, serverId, createEnrichmentConnection, driverLocation, driverName, connectTimeout, maxQueueSize, maxQueueOfferTimeout);
+            tryCount.set(0);
         } catch (IOException | IllegalStateException e) {
             context.yield();
             binlogClient = null;
@@ -646,7 +647,11 @@ public class CaptureChangeMySQL extends AbstractSessionFactoryProcessor {
 
         // Create a client if we don't have one
         if (binlogClient == null) {
-            setup(context);
+            if(maxConnectionCount==0 || tryCount.incrementAndGet()<=maxConnectionCount) {
+                setup(context);
+            }else{
+                return;
+            }
         }
 
         // If the client has been disconnected, try to reconnect
